@@ -263,6 +263,17 @@
       background: var(--accent-soft);
     }
 
+    .option-item.is-correct-answer {
+      border: 2px solid var(--success);
+      font-weight: 700;
+      background: rgba(22, 163, 74, 0.08);
+    }
+
+    .questions-panel.is-locked .option-item {
+      cursor: not-allowed;
+      opacity: 0.92;
+    }
+
     .modal {
       position: fixed;
       inset: 0;
@@ -483,6 +494,22 @@
     </section>
   </main>
 
+  <div class="modal" id="confirmModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+      <div class="modal-header">
+        <h3 id="confirmModalTitle">確認送出答案</h3>
+      </div>
+      <div class="modal-body">
+        <p>送出後將鎖定選項，無法再修改本次答案。</p>
+        <p>是否要檢查答案？</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelConfirmBtn" type="button">取消</button>
+        <button class="btn btn-primary" id="confirmCheckBtn" type="button">確認送出</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="resultModal" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
@@ -508,10 +535,13 @@
     };
 
     const resultModal = document.getElementById('resultModal');
+    const confirmModal = document.getElementById('confirmModal');
+    const checkAnswersBtn = document.getElementById('checkAnswersBtn');
     const modalMessage = document.getElementById('modalMessage');
     const summaryBox = document.getElementById('summaryBox');
     const reviewWrongBtn = document.getElementById('reviewWrongBtn');
     const questionsPanel = document.getElementById('questionsPanel');
+    let isSelectionLocked = false;
 
     function getSavedAnswers() {
       try {
@@ -524,6 +554,12 @@
     function saveAnswer(questionName, value) {
       const savedAnswers = getSavedAnswers();
       savedAnswers[questionName] = value;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedAnswers));
+    }
+
+    function removeAnswer(questionName) {
+      const savedAnswers = getSavedAnswers();
+      delete savedAnswers[questionName];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedAnswers));
     }
 
@@ -540,6 +576,30 @@
     function clearWrongHighlights() {
       document.querySelectorAll('.question-block').forEach((block) => {
         block.classList.remove('is-wrong');
+      });
+    }
+
+    function clearCorrectHighlights() {
+      document.querySelectorAll('.option-item').forEach((option) => {
+        option.classList.remove('is-correct-answer');
+      });
+    }
+
+    function markCorrectAnswers() {
+      clearCorrectHighlights();
+      Object.entries(ANSWER_KEY).forEach(([question, answer]) => {
+        const correctOption = document.querySelector(`input[name="${question}"][value="${answer}"]`)?.closest('.option-item');
+        if (correctOption) {
+          correctOption.classList.add('is-correct-answer');
+        }
+      });
+    }
+
+    function setSelectionLock(locked) {
+      isSelectionLocked = locked;
+      questionsPanel.classList.toggle('is-locked', locked);
+      document.querySelectorAll('input[type="radio"]').forEach((radio) => {
+        radio.disabled = locked;
       });
     }
 
@@ -585,6 +645,16 @@
       resultModal.setAttribute('aria-hidden', 'true');
     }
 
+    function openConfirmModal() {
+      confirmModal.classList.add('show');
+      confirmModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeConfirmModal() {
+      confirmModal.classList.remove('show');
+      confirmModal.setAttribute('aria-hidden', 'true');
+    }
+
     function renderSummary(result) {
       const incorrectCount = result.wrong.length;
       const unansweredCount = result.unanswered.length;
@@ -628,19 +698,71 @@
       (selectedInput || firstInput)?.focus();
     }
 
+    function submitAnswers() {
+      setSelectionLock(true);
+      markCorrectAnswers();
+
+      const result = evaluateAnswers();
+      renderSummary(result);
+      openModal();
+
+      checkAnswersBtn.textContent = '再次作答';
+    }
+
+    function resetQuiz() {
+      localStorage.removeItem(STORAGE_KEY);
+      document.querySelectorAll('input[type="radio"]').forEach((radio) => {
+        radio.checked = false;
+      });
+
+      clearWrongHighlights();
+      clearCorrectHighlights();
+      setSelectionLock(false);
+      closeModal();
+      closeConfirmModal();
+      checkAnswersBtn.textContent = '檢查答案';
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       loadAnswers();
 
+      document.querySelectorAll('.option-item').forEach((option) => {
+        option.addEventListener('click', (event) => {
+          const radio = option.querySelector('input[type="radio"]');
+          if (!radio) return;
+
+          if (isSelectionLocked) {
+            event.preventDefault();
+            return;
+          }
+
+          if (radio.checked) {
+            event.preventDefault();
+            radio.checked = false;
+            removeAnswer(radio.name);
+          }
+        });
+      });
+
       document.querySelectorAll('input[type="radio"]').forEach((radio) => {
         radio.addEventListener('change', (event) => {
+          if (isSelectionLocked) return;
           saveAnswer(event.target.name, event.target.value);
         });
       });
 
-      document.getElementById('checkAnswersBtn').addEventListener('click', () => {
-        const result = evaluateAnswers();
-        renderSummary(result);
-        openModal();
+      checkAnswersBtn.addEventListener('click', () => {
+        if (isSelectionLocked) {
+          resetQuiz();
+          return;
+        }
+        openConfirmModal();
+      });
+
+      document.getElementById('cancelConfirmBtn').addEventListener('click', closeConfirmModal);
+      document.getElementById('confirmCheckBtn').addEventListener('click', () => {
+        closeConfirmModal();
+        submitAnswers();
       });
 
       document.getElementById('closeModalBtn').addEventListener('click', closeModal);
@@ -652,8 +774,19 @@
         }
       });
 
+      confirmModal.addEventListener('click', (event) => {
+        if (event.target === confirmModal) {
+          closeConfirmModal();
+        }
+      });
+
       document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && resultModal.classList.contains('show')) {
+        if (event.key !== 'Escape') return;
+        if (confirmModal.classList.contains('show')) {
+          closeConfirmModal();
+          return;
+        }
+        if (resultModal.classList.contains('show')) {
           closeModal();
         }
       });
