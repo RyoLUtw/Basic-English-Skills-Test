@@ -173,6 +173,47 @@
       transform: translateY(1px);
     }
 
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .share-btn {
+      border: none;
+      background: #0f766e;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .share-btn:hover {
+      opacity: 0.92;
+    }
+
+    .share-btn:active {
+      transform: translateY(1px);
+    }
+
+    .share-url-box {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .share-url-input {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      color: #111827;
+      font-size: 0.9rem;
+    }
+
     .section-body {
       height: calc(100% - 77px);
       overflow: hidden;
@@ -261,6 +302,17 @@
     .option-item:has(input:checked) {
       border-color: var(--accent);
       background: var(--accent-soft);
+    }
+
+    .option-item.is-correct-answer {
+      border: 2px solid var(--success);
+      font-weight: 700;
+      background: rgba(22, 163, 74, 0.08);
+    }
+
+    .questions-panel.is-locked .option-item {
+      cursor: not-allowed;
+      opacity: 0.92;
     }
 
     .modal {
@@ -379,7 +431,7 @@
         <span>測驗技能</span>
       </div>
       <ul class="nav-list">
-        <li><a href="#bottom-up-reading"><span class="nav-icon">1</span><span class="nav-label">字詞句細讀</span></a></li>
+        <li><a href="#bottom-up-reading"><span class="nav-icon">1</span><span class="nav-label">細節建構式閱讀能力測試</span></a></li>
       </ul>
     </div>
   </nav>
@@ -388,10 +440,13 @@
     <section class="test-section" id="bottom-up-reading">
       <div class="section-header">
         <div>
-          <h2>字詞句細讀</h2>
+          <h2>細節建構式閱讀能力測試</h2>
           <p>請仔細閱讀文章，並選出最適合的答案。</p>
         </div>
-        <button class="check-btn" id="checkAnswersBtn" type="button">檢查答案</button>
+        <div class="header-actions">
+          <button class="check-btn" id="checkAnswersBtn" type="button">檢查答案</button>
+          <button class="share-btn hidden" id="shareResultBtn" type="button">分享結果</button>
+        </div>
       </div>
 
       <div class="section-body">
@@ -483,6 +538,22 @@
     </section>
   </main>
 
+  <div class="modal" id="confirmModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+      <div class="modal-header">
+        <h3 id="confirmModalTitle">確認送出答案</h3>
+      </div>
+      <div class="modal-body">
+        <p>送出後將鎖定選項，無法再修改本次答案。</p>
+        <p>是否要檢查答案？</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelConfirmBtn" type="button">取消</button>
+        <button class="btn btn-primary" id="confirmCheckBtn" type="button">確認送出</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="resultModal" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
@@ -499,6 +570,25 @@
     </div>
   </div>
 
+
+  <div class="modal" id="shareModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+      <div class="modal-header">
+        <h3 id="shareModalTitle">分享作答結果</h3>
+      </div>
+      <div class="modal-body">
+        <p>以下是可分享的結果網址，已包含本次作答摘要。</p>
+        <div class="share-url-box">
+          <input class="share-url-input" id="shareUrlInput" type="text" readonly aria-label="分享網址">
+          <button class="btn btn-primary" id="copyShareUrlBtn" type="button">複製網址</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="closeShareModalBtn" type="button">關閉</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const STORAGE_KEY = 'basic_english_proficiency_answers';
     const ANSWER_KEY = {
@@ -508,10 +598,18 @@
     };
 
     const resultModal = document.getElementById('resultModal');
+    const confirmModal = document.getElementById('confirmModal');
+    const shareModal = document.getElementById('shareModal');
+    const checkAnswersBtn = document.getElementById('checkAnswersBtn');
+    const shareResultBtn = document.getElementById('shareResultBtn');
     const modalMessage = document.getElementById('modalMessage');
     const summaryBox = document.getElementById('summaryBox');
     const reviewWrongBtn = document.getElementById('reviewWrongBtn');
     const questionsPanel = document.getElementById('questionsPanel');
+    const shareUrlInput = document.getElementById('shareUrlInput');
+    const copyShareUrlBtn = document.getElementById('copyShareUrlBtn');
+    let isSelectionLocked = false;
+    let latestResult = null;
 
     function getSavedAnswers() {
       try {
@@ -527,6 +625,12 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedAnswers));
     }
 
+    function removeAnswer(questionName) {
+      const savedAnswers = getSavedAnswers();
+      delete savedAnswers[questionName];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedAnswers));
+    }
+
     function loadAnswers() {
       const savedAnswers = getSavedAnswers();
       Object.entries(savedAnswers).forEach(([questionName, value]) => {
@@ -537,9 +641,52 @@
       });
     }
 
+    function loadAnswersFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const hasQuery = params.toString().length > 0;
+      if (!hasQuery) return false;
+
+      const queryAnswers = {};
+      Object.keys(ANSWER_KEY).forEach((question) => {
+        const value = params.get(question);
+        if (!value) return;
+        const isValid = Boolean(document.querySelector(`input[name="${question}"][value="${value}"]`));
+        if (isValid) {
+          queryAnswers[question] = value;
+        }
+      });
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(queryAnswers));
+      return true;
+    }
+
     function clearWrongHighlights() {
       document.querySelectorAll('.question-block').forEach((block) => {
         block.classList.remove('is-wrong');
+      });
+    }
+
+    function clearCorrectHighlights() {
+      document.querySelectorAll('.option-item').forEach((option) => {
+        option.classList.remove('is-correct-answer');
+      });
+    }
+
+    function markCorrectAnswers() {
+      clearCorrectHighlights();
+      Object.entries(ANSWER_KEY).forEach(([question, answer]) => {
+        const correctOption = document.querySelector(`input[name="${question}"][value="${answer}"]`)?.closest('.option-item');
+        if (correctOption) {
+          correctOption.classList.add('is-correct-answer');
+        }
+      });
+    }
+
+    function setSelectionLock(locked) {
+      isSelectionLocked = locked;
+      questionsPanel.classList.toggle('is-locked', locked);
+      document.querySelectorAll('input[type="radio"]').forEach((radio) => {
+        radio.disabled = locked;
       });
     }
 
@@ -585,6 +732,42 @@
       resultModal.setAttribute('aria-hidden', 'true');
     }
 
+    function openConfirmModal() {
+      confirmModal.classList.add('show');
+      confirmModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeConfirmModal() {
+      confirmModal.classList.remove('show');
+      confirmModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function openShareModal() {
+      shareModal.classList.add('show');
+      shareModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeShareModal() {
+      shareModal.classList.remove('show');
+      shareModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function buildShareUrl(result) {
+      const baseUrl = `${window.location.origin}${window.location.pathname}`;
+      const params = new URLSearchParams();
+      const savedAnswers = getSavedAnswers();
+      params.set('correct', String(result.correct));
+      params.set('total', String(result.total));
+      params.set('wrong', String(result.wrong.length));
+      params.set('unanswered', String(result.unanswered.length));
+
+      Object.keys(ANSWER_KEY).forEach((question) => {
+        params.set(question, savedAnswers[question] || '');
+      });
+
+      return `${baseUrl}?${params.toString()}`;
+    }
+
     function renderSummary(result) {
       const incorrectCount = result.wrong.length;
       const unansweredCount = result.unanswered.length;
@@ -628,23 +811,109 @@
       (selectedInput || firstInput)?.focus();
     }
 
+    function submitAnswers() {
+      setSelectionLock(true);
+      markCorrectAnswers();
+
+      const result = evaluateAnswers();
+      latestResult = result;
+      renderSummary(result);
+      openModal();
+
+      checkAnswersBtn.textContent = '再次作答';
+      shareResultBtn.classList.remove('hidden');
+    }
+
+    function resetQuiz() {
+      localStorage.removeItem(STORAGE_KEY);
+      document.querySelectorAll('input[type="radio"]').forEach((radio) => {
+        radio.checked = false;
+      });
+
+      clearWrongHighlights();
+      clearCorrectHighlights();
+      setSelectionLock(false);
+      closeModal();
+      closeConfirmModal();
+      closeShareModal();
+      latestResult = null;
+      checkAnswersBtn.textContent = '檢查答案';
+      shareResultBtn.classList.add('hidden');
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
+      const hasQuery = loadAnswersFromQuery();
       loadAnswers();
+
+      document.querySelectorAll('.option-item').forEach((option) => {
+        const radio = option.querySelector('input[type="radio"]');
+        if (!radio) return;
+
+        option.addEventListener('pointerdown', () => {
+          option.dataset.wasChecked = radio.checked ? '1' : '0';
+        });
+
+        option.addEventListener('click', (event) => {
+          if (isSelectionLocked) {
+            event.preventDefault();
+            return;
+          }
+
+          const wasChecked = option.dataset.wasChecked === '1';
+          if (wasChecked) {
+            event.preventDefault();
+            radio.checked = false;
+            removeAnswer(radio.name);
+          }
+
+          delete option.dataset.wasChecked;
+        });
+      });
 
       document.querySelectorAll('input[type="radio"]').forEach((radio) => {
         radio.addEventListener('change', (event) => {
+          if (isSelectionLocked) return;
           saveAnswer(event.target.name, event.target.value);
         });
       });
 
-      document.getElementById('checkAnswersBtn').addEventListener('click', () => {
-        const result = evaluateAnswers();
-        renderSummary(result);
-        openModal();
+      checkAnswersBtn.addEventListener('click', () => {
+        if (isSelectionLocked) {
+          resetQuiz();
+          return;
+        }
+        openConfirmModal();
+      });
+
+      document.getElementById('cancelConfirmBtn').addEventListener('click', closeConfirmModal);
+      document.getElementById('confirmCheckBtn').addEventListener('click', () => {
+        closeConfirmModal();
+        submitAnswers();
       });
 
       document.getElementById('closeModalBtn').addEventListener('click', closeModal);
       reviewWrongBtn.addEventListener('click', goToFirstWrongQuestion);
+      document.getElementById('closeShareModalBtn').addEventListener('click', closeShareModal);
+
+      shareResultBtn.addEventListener('click', () => {
+        if (!latestResult) return;
+        shareUrlInput.value = buildShareUrl(latestResult);
+        openShareModal();
+      });
+
+      copyShareUrlBtn.addEventListener('click', async () => {
+        if (!shareUrlInput.value) return;
+        try {
+          await navigator.clipboard.writeText(shareUrlInput.value);
+          copyShareUrlBtn.textContent = '已複製';
+          setTimeout(() => {
+            copyShareUrlBtn.textContent = '複製網址';
+          }, 1200);
+        } catch (error) {
+          shareUrlInput.select();
+          document.execCommand('copy');
+        }
+      });
 
       resultModal.addEventListener('click', (event) => {
         if (event.target === resultModal) {
@@ -652,8 +921,41 @@
         }
       });
 
+      confirmModal.addEventListener('click', (event) => {
+        if (event.target === confirmModal) {
+          closeConfirmModal();
+        }
+      });
+
+      shareModal.addEventListener('click', (event) => {
+        if (event.target === shareModal) {
+          closeShareModal();
+        }
+      });
+
+      if (hasQuery) {
+        setTimeout(() => {
+          if (isSelectionLocked) return;
+          checkAnswersBtn.click();
+          setTimeout(() => {
+            if (confirmModal.classList.contains('show')) {
+              document.getElementById('confirmCheckBtn').click();
+            }
+          }, 80);
+        }, 500);
+      }
+
       document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && resultModal.classList.contains('show')) {
+        if (event.key !== 'Escape') return;
+        if (confirmModal.classList.contains('show')) {
+          closeConfirmModal();
+          return;
+        }
+        if (shareModal.classList.contains('show')) {
+          closeShareModal();
+          return;
+        }
+        if (resultModal.classList.contains('show')) {
           closeModal();
         }
       });
