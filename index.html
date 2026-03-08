@@ -641,6 +641,25 @@
       });
     }
 
+    function loadAnswersFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const hasQuery = params.toString().length > 0;
+      if (!hasQuery) return false;
+
+      const queryAnswers = {};
+      Object.keys(ANSWER_KEY).forEach((question) => {
+        const value = params.get(question);
+        if (!value) return;
+        const isValid = Boolean(document.querySelector(`input[name="${question}"][value="${value}"]`));
+        if (isValid) {
+          queryAnswers[question] = value;
+        }
+      });
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(queryAnswers));
+      return true;
+    }
+
     function clearWrongHighlights() {
       document.querySelectorAll('.question-block').forEach((block) => {
         block.classList.remove('is-wrong');
@@ -741,7 +760,11 @@
       params.set('total', String(result.total));
       params.set('wrong', String(result.wrong.length));
       params.set('unanswered', String(result.unanswered.length));
-      params.set('answers', btoa(JSON.stringify(savedAnswers)));
+
+      Object.keys(ANSWER_KEY).forEach((question) => {
+        params.set(question, savedAnswers[question] || '');
+      });
+
       return `${baseUrl}?${params.toString()}`;
     }
 
@@ -819,23 +842,31 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      const hasQuery = loadAnswersFromQuery();
       loadAnswers();
 
       document.querySelectorAll('.option-item').forEach((option) => {
-        option.addEventListener('click', (event) => {
-          const radio = option.querySelector('input[type="radio"]');
-          if (!radio) return;
+        const radio = option.querySelector('input[type="radio"]');
+        if (!radio) return;
 
+        option.addEventListener('pointerdown', () => {
+          option.dataset.wasChecked = radio.checked ? '1' : '0';
+        });
+
+        option.addEventListener('click', (event) => {
           if (isSelectionLocked) {
             event.preventDefault();
             return;
           }
 
-          if (radio.checked) {
+          const wasChecked = option.dataset.wasChecked === '1';
+          if (wasChecked) {
             event.preventDefault();
             radio.checked = false;
             removeAnswer(radio.name);
           }
+
+          delete option.dataset.wasChecked;
         });
       });
 
@@ -901,6 +932,18 @@
           closeShareModal();
         }
       });
+
+      if (hasQuery) {
+        setTimeout(() => {
+          if (isSelectionLocked) return;
+          checkAnswersBtn.click();
+          setTimeout(() => {
+            if (confirmModal.classList.contains('show')) {
+              document.getElementById('confirmCheckBtn').click();
+            }
+          }, 80);
+        }, 500);
+      }
 
       document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
