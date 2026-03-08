@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>基礎英文能力測驗</title>
+  <style>
+    :root {
+      --nav-collapsed: 60px;
+      --nav-expanded: 220px;
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --border: #d8dee9;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --overlay: rgba(15, 23, 42, 0.55);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      scroll-behavior: smooth;
+    }
+
+    body {
+      padding-left: var(--nav-collapsed);
+    }
+
+    .side-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: var(--nav-collapsed);
+      height: 100vh;
+      background: #111827;
+      color: #fff;
+      overflow: hidden;
+      transition: width 0.25s ease;
+      z-index: 1000;
+      border-right: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .side-nav:hover,
+    .side-nav:focus-within {
+      width: var(--nav-expanded);
+    }
+
+    .nav-inner {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .nav-title {
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      font-weight: bold;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      white-space: nowrap;
+    }
+
+    .nav-title span,
+    .nav-label {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .side-nav:hover .nav-title span,
+    .side-nav:hover .nav-label,
+    .side-nav:focus-within .nav-title span,
+    .side-nav:focus-within .nav-label {
+      opacity: 1;
+    }
+
+    .nav-list {
+      list-style: none;
+      padding: 10px 0;
+      margin: 0;
+      overflow-y: auto;
+    }
+
+    .nav-list a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 50px;
+      padding: 10px 18px;
+      color: #fff;
+      text-decoration: none;
+      border-left: 3px solid transparent;
+      white-space: nowrap;
+    }
+
+    .nav-list a:hover,
+    .nav-list a:focus {
+      background: rgba(255,255,255,0.08);
+      border-left-color: var(--accent);
+      outline: none;
+    }
+
+    .nav-icon {
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    main {
+      padding: 24px 20px 40px;
+    }
+
+    .test-section {
+      width: 90%;
+      height: 80vh;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.06);
+      overflow: hidden;
+      scroll-margin-top: 20px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: #fafbfd;
+    }
+
+    .section-header h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .section-header p {
+      margin: 4px 0 0;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .check-btn {
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .check-btn:hover {
+      opacity: 0.92;
+    }
+
+    .check-btn:active {
+      transform: translateY(1px);
+    }
+
+    .section-body {
+      height: calc(100% - 77px);
+      overflow: hidden;
+    }
+
+    .reading-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: 100%;
+    }
+
+    .panel {
+      height: 100%;
+      overflow-y: auto;
+      padding: 22px;
+    }
+
+    .panel + .panel {
+      border-left: 2px solid var(--border);
+    }
+
+    .panel h3 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 1.05rem;
+    }
+
+    .reading-text p {
+      line-height: 1.7;
+      margin: 0 0 16px;
+    }
+
+    .question-block {
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid #e5e7eb;
+      scroll-margin-top: 18px;
+    }
+
+    .question-block:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .question-block.is-wrong {
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      background: rgba(220, 38, 38, 0.04);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .question-text {
+      margin: 0 0 14px;
+      line-height: 1.6;
+      font-weight: 600;
+    }
+
+    .option-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .option-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .option-item:hover {
+      border-color: var(--accent);
+      background: #f8fbff;
+    }
+
+    .option-item input[type="radio"] {
+      margin-top: 2px;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .option-item:has(input:checked) {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: var(--overlay);
+      z-index: 2000;
+      padding: 20px;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(520px, 100%);
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+      overflow: hidden;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+      padding: 20px 22px;
+    }
+
+    .modal-header {
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .modal-body p {
+      margin: 0 0 12px;
+      line-height: 1.65;
+    }
+
+    .summary-box {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-top: 14px;
+    }
+
+    .summary-box strong.correct {
+      color: var(--success);
+    }
+
+    .summary-box strong.wrong {
+      color: var(--danger);
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 900px) {
+      .test-section {
+        width: 94%;
+      }
+
+      .reading-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .panel + .panel {
+        border-left: none;
+        border-top: 2px solid var(--border);
+      }
+
+      .section-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="side-nav" aria-label="技能導覽列">
+    <div class="nav-inner">
+      <div class="nav-title">
+        <span>測驗技能</span>
+      </div>
+      <ul class="nav-list">
+        <li><a href="#bottom-up-reading"><span class="nav-icon">1</span><span class="nav-label">字詞句細讀</span></a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <section class="test-section" id="bottom-up-reading">
+      <div class="section-header">
+        <div>
+          <h2>字詞句細讀</h2>
+          <p>請仔細閱讀文章，並選出最適合的答案。</p>
+        </div>
+        <button class="check-btn" id="checkAnswersBtn" type="button">檢查答案</button>
+      </div>
+
+      <div class="section-body">
+        <div class="reading-layout">
+          <div class="panel reading-text">
+            <h3>閱讀文章</h3>
+            <p>Many people think success only comes from talent or being very smart. However, studies show that daily habits can be even more important. Small actions repeated every day can be changed by how people learn, stay healthy, and work.</p>
+
+            <p>For example, habits can affect feelings and stress. Good daily routines create a sense of order in life. Supportive environments encourage people to make good choices. Because of this, experts suggest starting with small habits that are easy to keep.</p>
+
+            <p>Students often build habits that had affected how well they did in school. If a student reviews new vocabulary words every day, this practice had strengthened their memory in the brain.</p>
+
+            <p>Healthy habits also were helped by the body. The heart benefits regular exercise and blood flow is improved by thinking. Given by the body, Healthy meals get the nutrients it needs. The body recover and regain energy and helps to get enough sleep.</p>
+
+            <p>Over time, these small habits can lead to big changes. Simple actions, repeated again and again, can help people grow and succeed.</p>
+          </div>
+
+          <div class="panel questions-panel" id="questionsPanel">
+            <h3>題目</h3>
+
+            <div class="question-block" data-question="q1" id="q1-block">
+              <p class="question-text">1) According to the reading, which of the following is true about the relation between habits and feelings and stress?</p>
+              <div class="option-list">
+                <label class="option-item">
+                  <input type="radio" name="q1" value="A">
+                  <span>A. Good daily routines create a sense of order in life.</span>
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="q1" value="B">
+                  <span>B. Habits do not affect feelings and stress.</span>
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="q1" value="C">
+                  <span>C. Supportive environments stop people from making good choices.</span>
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="q1" value="D">
+                  <span>D. Experts suggest starting with habits that are hard to keep.</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="question-block" data-question="q2" id="q2-block">
+              <p class="question-text">2) According to the reading, which of the following is true about the relation between habits and performance in school?</p>
+              <div class="option-list">
+                <label class="option-item">
+                  <input type="radio" name="q2" value="A">
+                  <span>A. If something had helped a student get a good grade, they turn it into a habit.</span>
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="q2" value="B">
+                  <span>B. Students' habits change how well they do in school.</span>
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="q2" value="C">
+                  <span>C. Students review vocabulary because school had strengthened their memory in the brain.</span>
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="q2" value="D">
+                  <span>D. Regular study causes students to forget information over time.</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="question-block" data-question="q3" id="q3-block">
+              <p class="question-text">3) According to the reading, which of the following is true about the relation between healthy habits and the body?</p>
+              <div class="option-list">
+                <label class="option-item">
+                  <input type="radio" name="q3" value="A">
+                  <span>A. The body can help healthy diet.</span>
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="q3" value="B">
+                  <span>B. The body was helped by healthy habits.</span>
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="q3" value="C">
+                  <span>C. Regular exercise benefit from the heart and improved blood flow.</span>
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="q3" value="D">
+                  <span>D. Healthy meals gave the nutrients the body needs.</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal" id="resultModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h3 id="modalTitle">作答結果</h3>
+      </div>
+      <div class="modal-body">
+        <p id="modalMessage">這裡會顯示作答摘要。</p>
+        <div class="summary-box" id="summaryBox"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="closeModalBtn" type="button">關閉</button>
+        <button class="btn btn-primary" id="reviewWrongBtn" type="button">檢視錯題</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'basic_english_proficiency_answers';
+    const ANSWER_KEY = {
+      q1: 'A',
+      q2: 'B',
+      q3: 'B'
+    };
+
+    const resultModal = document.getElementById('resultModal');
+    const modalMessage = document.getElementById('modalMessage');
+    const summaryBox = document.getElementById('summaryBox');
+    const reviewWrongBtn = document.getElementById('reviewWrongBtn');
+    const questionsPanel = document.getElementById('questionsPanel');
+
+    function getSavedAnswers() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+      } catch (error) {
+        return {};
+      }
+    }
+
+    function saveAnswer(questionName, value) {
+      const savedAnswers = getSavedAnswers();
+      savedAnswers[questionName] = value;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedAnswers));
+    }
+
+    function loadAnswers() {
+      const savedAnswers = getSavedAnswers();
+      Object.entries(savedAnswers).forEach(([questionName, value]) => {
+        const input = document.querySelector(`input[name="${questionName}"][value="${value}"]`);
+        if (input) {
+          input.checked = true;
+        }
+      });
+    }
+
+    function clearWrongHighlights() {
+      document.querySelectorAll('.question-block').forEach((block) => {
+        block.classList.remove('is-wrong');
+      });
+    }
+
+    function evaluateAnswers() {
+      const savedAnswers = getSavedAnswers();
+      const result = {
+        total: Object.keys(ANSWER_KEY).length,
+        correct: 0,
+        wrong: [],
+        unanswered: []
+      };
+
+      clearWrongHighlights();
+
+      Object.entries(ANSWER_KEY).forEach(([question, correctAnswer]) => {
+        const selected = savedAnswers[question];
+        const block = document.getElementById(`${question}-block`);
+
+        if (!selected) {
+          result.unanswered.push(question);
+          if (block) block.classList.add('is-wrong');
+          return;
+        }
+
+        if (selected === correctAnswer) {
+          result.correct += 1;
+        } else {
+          result.wrong.push(question);
+          if (block) block.classList.add('is-wrong');
+        }
+      });
+
+      return result;
+    }
+
+    function openModal() {
+      resultModal.classList.add('show');
+      resultModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeModal() {
+      resultModal.classList.remove('show');
+      resultModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function renderSummary(result) {
+      const incorrectCount = result.wrong.length;
+      const unansweredCount = result.unanswered.length;
+      const score = `${result.correct} / ${result.total}`;
+
+      if (incorrectCount === 0 && unansweredCount === 0) {
+        modalMessage.textContent = '做得很好，你全部答對了。';
+      } else if (unansweredCount > 0) {
+        modalMessage.textContent = '你還有題目未作答，以下是目前的作答表現。';
+      } else {
+        modalMessage.textContent = '以下是本次作答摘要，建議回頭檢查錯誤的題目。';
+      }
+
+      summaryBox.innerHTML = `
+        <p><strong>總分：</strong> ${score}</p>
+        <p><strong class="correct">答對：</strong> ${result.correct} 題</p>
+        <p><strong class="wrong">答錯：</strong> ${incorrectCount} 題</p>
+        <p><strong>未作答：</strong> ${unansweredCount} 題</p>
+      `;
+
+      if (incorrectCount === 0 && unansweredCount === 0) {
+        reviewWrongBtn.classList.add('hidden');
+      } else {
+        reviewWrongBtn.classList.remove('hidden');
+      }
+    }
+
+    function goToFirstWrongQuestion() {
+      const result = evaluateAnswers();
+      const targetQuestion = result.wrong[0] || result.unanswered[0];
+      if (!targetQuestion) return;
+
+      closeModal();
+
+      const targetBlock = document.getElementById(`${targetQuestion}-block`);
+      if (!targetBlock) return;
+
+      targetBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const selectedInput = targetBlock.querySelector('input:checked');
+      const firstInput = targetBlock.querySelector('input');
+      (selectedInput || firstInput)?.focus();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAnswers();
+
+      document.querySelectorAll('input[type="radio"]').forEach((radio) => {
+        radio.addEventListener('change', (event) => {
+          saveAnswer(event.target.name, event.target.value);
+        });
+      });
+
+      document.getElementById('checkAnswersBtn').addEventListener('click', () => {
+        const result = evaluateAnswers();
+        renderSummary(result);
+        openModal();
+      });
+
+      document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+      reviewWrongBtn.addEventListener('click', goToFirstWrongQuestion);
+
+      resultModal.addEventListener('click', (event) => {
+        if (event.target === resultModal) {
+          closeModal();
+        }
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && resultModal.classList.contains('show')) {
+          closeModal();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
